@@ -56,7 +56,6 @@
 
 #define BUFFER_SIZE 8192
 
-static constexpr auto DEBUG = true;
 static int sSocketID;
 static std::string sHomeAlarmAudioPath = "";
 static std::string sAwayAlarmAudioPath = "";
@@ -69,7 +68,8 @@ enum CredKey {
   PASSWORD,
   SUBSCRIPTION,
   ALARM_AWAY,
-  ALARM_HOME
+  ALARM_HOME,
+  DEBUG
 };
 
 struct Credentials {
@@ -80,14 +80,15 @@ struct Credentials {
 // Define the core configuration keys as static constexpr so that they are
 // statically compiled into the program, we don't want to construct strings at
 // run time because it's unnecessary.
-static constexpr std::array<Credentials, 7> CredWords = {
+static constexpr std::array<Credentials, 8> CredWords = {
     {{CredKey::IP, "IP"},
      {CredKey::ID, "ID"},
      {CredKey::USER, "USER"},
      {CredKey::PASSWORD, "PASSWORD"},
      {CredKey::SUBSCRIPTION, "SUBSCRIPTION"},
      {CredKey::ALARM_AWAY, "ALARM_AWAY"},
-     {CredKey::ALARM_HOME, "ALARM_HOME"}}};
+     {CredKey::ALARM_HOME, "ALARM_HOME"},
+     {CredKey::ALARM_HOME, "DEBUG"}}};
 
 struct AudioKeys {
   AudioKeys(std::string aKeyString, std::string aFilePath)
@@ -106,6 +107,7 @@ static std::string sId = "";
 static std::string sUser = "";
 static std::string sPassword = "";
 static std::string sSubscription = "";
+static bool sDebug = false;
 
 /********************************
  * Audio Class
@@ -158,7 +160,7 @@ void Audio::PlayAudio(std::string aFilePath, const bool aIsRepeat) {
 }
 
 void Audio::Play(std::string aFilePath, const bool aIsRepeat) {
-  if (DEBUG == true) {
+  if (sDebug == true) {
     std::cout << "Audio::PlayAudio called\n";
   }
   ao_device *device;
@@ -208,7 +210,7 @@ void Audio::Play(std::string aFilePath, const bool aIsRepeat) {
   int read = 0;
   while ((read = sf_read_short(file, buffer, BUFFER_SIZE)) > 0 && IsPlaying()) {
     if (ao_play(device, (char *)buffer, (uint_32)(read * sizeof(short))) == 0) {
-      if (DEBUG == true) {
+      if (sDebug == true) {
         std::cout << "Error playing file";
       }
       SetPlaying(false);
@@ -343,7 +345,7 @@ private:
 
   // Callback for when a message arrives.
   void message_arrived(mqtt::const_message_ptr msg) override {
-    if (DEBUG == true) {
+    if (sDebug == true) {
       std::cout << "Message arrived" << std::endl;
       std::cout << "\ttopic: '" << msg->get_topic() << "'" << std::endl;
       std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
@@ -445,6 +447,8 @@ int main() {
         case CredKey::ALARM_HOME:
           sHomeAlarmAudioPath = parameter;
           break;
+        case CredKey::DEBUG:
+          sDebug = parameter == "TRUE";
         default:
           sAudioFiles.emplace_back(AudioKeys(key, parameter));
           break;
@@ -474,7 +478,6 @@ int main() {
   sSocketID = lirc_get_local_socket(NULL, 0);
   if (sSocketID < 0) {
     std::cout << "ERROR: could not establish LIRC socket ID\n";
-    std::cout << "liblirc-dev must be installed.\n";
   }
   sPlayer = std::make_unique<Audio>();
 
